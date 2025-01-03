@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daylight Duration in Prague</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <canvas id="daylightChart" width="800" height="400"></canvas>
+    <script>
+        async function getSunTimes(date, lat = 50.0755, lng = 14.4378) {
+            const response = await fetch(`https://cors-anywhere.herokuapp.com/https://api.sunrise-sunset.org/json?lat=${lat}&lng=${lng}&date=${date}&formatted=0`);
+            const data = await response.json();
+            const sunrise = new Date(data.results.sunrise);
+            const sunset = new Date(data.results.sunset);
+            return { sunrise, sunset };
+        }
+
+        async function getDaylightDurations() {
+            const startDate = new Date('2024-01-01');
+            const dates = Array.from({ length: 365 }, (_, i) => new Date(startDate.getTime() + i * 86400000));
+            const sunTimes = await Promise.all(dates.map(date => getSunTimes(date.toISOString().split('T')[0])));
+            return sunTimes.map(({ sunrise, sunset }) => (sunset - sunrise) / 3600000);
+        }
+
+        async function plotDaylightDurations() {
+            const daylightDurations = await getDaylightDurations();
+            const weeks = Array.from({ length: 52 }, (_, i) => i + 1);
+            const weeklyData = weeks.map(week => {
+                const start = (week - 1) * 7;
+                const end = start + 7;
+                const weekDurations = daylightDurations.slice(start, end);
+                return weekDurations.reduce((a, b) => a + b, 0) / weekDurations.length;
+            });
+
+            const ctx = document.getElementById('daylightChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: weeks,
+                    datasets: [{
+                        label: 'Average Weekly Daylight Duration (hours)',
+                        data: weeklyData,
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 2,
+                        fill: false,
+                        pointRadius: 3,
+                        pointBackgroundColor: 'rgba(75, 192, 192, 1)'
+                    }]
+                },
+                options: {
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Week'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Daylight Duration (hours)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        plotDaylightDurations();
+    </script>
+</body>
+</html>
